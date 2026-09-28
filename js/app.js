@@ -31,11 +31,14 @@
   /* ---------- dashboard ---------- */
   function renderDashboard() {
     var t = HI.totals(state.items);
+    var grand = t.grand.value || 0;
     var cards = state.rooms.map(function (r) {
       var rt = t.perRoom[r.id] || { count: 0, value: 0 };
+      var pct = grand > 0 ? Math.max(2, Math.round((rt.value / grand) * 100)) : 0;
       return '<div class="card"><h3>' + esc(r.name) + '</h3>' +
         '<div class="big">' + HI.money(rt.value) + '</div>' +
-        '<div class="muted">' + rt.count + ' item' + (rt.count === 1 ? '' : 's') + '</div></div>';
+        '<div class="muted">' + rt.count + ' item' + (rt.count === 1 ? '' : 's') + '</div>' +
+        '<div class="vbar"><span style="width:' + pct + '%"></span></div></div>';
     }).join("");
     document.getElementById("dashCards").innerHTML = cards;
     document.getElementById("grandTotal").textContent = HI.money(t.grand.value);
@@ -47,11 +50,11 @@
   function renderRooms() {
     var t = HI.totals(state.items);
     var html = '<button class="room' + (state.roomFilter === "all" ? " active" : "") +
-      '" data-room="all">All rooms (' + t.grand.count + ')</button>';
+      '" data-room="all"><span>' + esc("All rooms") + '</span><span class="rcount">' + t.grand.count + '</span></button>';
     html += state.rooms.map(function (r) {
       var c = (t.perRoom[r.id] || { count: 0 }).count;
       return '<button class="room' + (state.roomFilter === r.id ? " active" : "") +
-        '" data-room="' + r.id + '">' + esc(r.name) + ' (' + c + ')</button>';
+        '" data-room="' + r.id + '"><span>' + esc(r.name) + '</span><span class="rcount">' + c + '</span></button>';
     }).join("");
     document.getElementById("roomList").innerHTML = html;
     var sel = document.getElementById("fRoom");
@@ -66,19 +69,27 @@
       return state.roomFilter === "all" || it.roomId === state.roomFilter;
     });
     list = HI.search(list, state.query);
-    var rows = list.map(function (it) {
-      return '<tr>' +
-        '<td>' + (it.photo ? '<img class="thumb" src="' + it.photo + '" alt="">' : '<span class="muted">—</span>') + '</td>' +
-        '<td><strong>' + esc(it.name) + '</strong><div class="muted small">' + esc(it.category) + '</div></td>' +
-        '<td>' + esc(roomName(it.roomId)) + '</td>' +
-        '<td class="num">' + HI.money(it.price) + '</td>' +
-        '<td>' + esc(it.date || "—") + '</td>' +
-        '<td>' + esc(it.serial || "—") + '</td>' +
-        '<td><button data-edit="' + it.id + '">Edit</button> ' +
-        '<button data-del="' + it.id + '" class="danger">Delete</button></td></tr>';
+    var cards = list.map(function (it) {
+      return '<article class="itemcard">' +
+        '<div class="ic-photo">' + (it.photo
+          ? '<img class="thumb" src="' + it.photo + '" alt="">'
+          : '<span class="ic-nophoto">No photo</span>') + '</div>' +
+        '<div class="ic-body">' +
+        '<span class="ic-cat">' + esc(it.category || "Uncategorized") + '</span>' +
+        '<h3>' + esc(it.name) + '</h3>' +
+        '<div class="ic-price">' + HI.money(it.price) + '</div>' +
+        '<dl class="ic-meta">' +
+        '<div><dt>Room</dt><dd>' + esc(roomName(it.roomId)) + '</dd></div>' +
+        '<div><dt>Purchased</dt><dd>' + esc(it.date || "—") + '</dd></div>' +
+        '<div><dt>Serial</dt><dd>' + esc(it.serial || "—") + '</dd></div>' +
+        '</dl>' +
+        (it.notes ? '<p class="ic-notes">' + esc(it.notes) + '</p>' : '') +
+        '<div class="ic-actions"><button data-edit="' + it.id + '">Edit</button> ' +
+        '<button data-del="' + it.id + '" class="danger">Delete</button></div>' +
+        '</div></article>';
     }).join("");
-    document.getElementById("itemRows").innerHTML = rows ||
-      '<tr><td colspan="7" class="muted">No items yet — add your first one below.</td></tr>';
+    document.getElementById("itemRows").innerHTML = cards ||
+      '<div class="empty-state"><strong>No items yet</strong>Add your first item below — name, price, and a photo are all an insurer needs to start.</div>';
   }
 
   function renderAll() { renderDashboard(); renderRooms(); renderItems(); }

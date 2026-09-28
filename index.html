@@ -4,19 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HomeInventory AI — Home Inventory for Insurance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="wrap">
-    <h1>HomeInventory AI</h1>
-    <p class="tagline">Document everything you own — so an insurance claim never relies on memory.</p>
-    <nav class="tabs no-print">
+  <div class="wrap topbar-inner">
+    <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg></span><span>HomeInventory <em>AI</em></span></div>
+    <nav class="tabs no-print" aria-label="Sections">
       <button data-tab="inventory" class="active">Inventory</button>
-      <button data-tab="dashboard">Dashboard</button>
+      <button data-tab="dashboard">Coverage</button>
       <button data-tab="guidance">Insurance tips</button>
     </nav>
   </div>
+  <div class="wrap"><p class="tagline">Document everything you own — so an insurance claim never relies on memory.</p></div>
 </header>
 
 <main class="wrap">
@@ -24,26 +27,25 @@
   <section id="tab-inventory" class="tabpage active">
     <div class="toolbar no-print">
       <input id="search" type="search" placeholder="Search items, serials, notes…">
-      <button id="exportCsv">Export CSV</button>
-      <button id="printBtn">Print / PDF</button>
+      <div class="toolbar-btns">
+        <button id="exportCsv" class="secondary">Export CSV</button>
+        <button id="printBtn" class="secondary">Print / PDF</button>
+      </div>
     </div>
     <div class="cols">
-      <aside class="no-print">
+      <aside class="no-print binder">
         <h2>Rooms</h2>
         <div id="roomList" class="rooms"></div>
-        <button id="addRoom" class="secondary">+ Add room</button>
+        <button id="addRoom" class="secondary wide">+ Add room</button>
       </aside>
       <div class="grow">
-        <table class="items">
-          <thead><tr>
-            <th>Photo</th><th>Item</th><th>Room</th><th class="num">Price</th>
-            <th>Purchased</th><th>Serial</th><th class="no-print">Actions</th>
-          </tr></thead>
-          <tbody id="itemRows"></tbody>
-        </table>
+        <div id="itemRows" class="itemgrid"></div>
 
         <form id="itemForm" class="panel no-print" onsubmit="return false">
-          <h2 id="formTitle">Add item</h2>
+          <div class="form-head">
+            <h2 id="formTitle">Add item</h2>
+            <p class="muted">Capture what the insurer will ask for: what it is, what it cost, when you bought it, and proof.</p>
+          </div>
           <div id="formError" class="error"></div>
           <div class="grid">
             <label>Item name*<input id="fName" required></label>
@@ -68,16 +70,24 @@
   <!-- DASHBOARD TAB -->
   <section id="tab-dashboard" class="tabpage">
     <div class="grand panel">
-      <div><div class="muted">Total documented value</div><div id="grandTotal" class="big"></div></div>
-      <div><div class="muted">Items</div><div id="grandCount" class="big"></div></div>
-      <button id="printBtn2" class="no-print" onclick="window.print()">Print report</button>
+      <div class="grand-figure">
+        <div class="muted">Total documented value</div>
+        <div id="grandTotal" class="big"></div>
+        <div class="muted"><span id="grandCount"></span></div>
+      </div>
+      <div class="grand-side no-print">
+        <p class="muted small">This is the number your claim starts from. Keep it current — photograph new purchases the day they arrive.</p>
+        <button id="printBtn2" onclick="window.print()">Print report</button>
+      </div>
     </div>
+    <h2 class="section-title">Value by room</h2>
     <div id="dashCards" class="cards"></div>
   </section>
 
   <!-- GUIDANCE TAB -->
   <section id="tab-guidance" class="tabpage">
-    <h2>Make your inventory claim-ready</h2>
+    <p class="eyebrow">Claim readiness</p>
+    <h2 class="guide-title">Make your inventory claim-ready</h2>
     <div id="guidance" class="guides"></div>
     <p class="muted small">HomeInventory AI is a documentation tool, not insurance or legal advice. Check your policy for coverage details.</p>
   </section>
