@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeInventory AI — Home Inventory for Insurance</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <h1>🏠 HomeInventory AI</h1>
+    <p class="tagline">Document everything you own — so an insurance claim never relies on memory.</p>
+    <nav class="tabs no-print">
+      <button data-tab="inventory" class="active">Inventory</button>
+      <button data-tab="dashboard">Dashboard</button>
+      <button data-tab="guidance">Insurance tips</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- INVENTORY TAB -->
+  <section id="tab-inventory" class="tabpage active">
+    <div class="toolbar no-print">
+      <input id="search" type="search" placeholder="Search items, serials, notes…">
+      <button id="exportCsv">⬇ Export CSV</button>
+      <button id="printBtn">🖨 Print / PDF</button>
+    </div>
+    <div class="cols">
+      <aside class="no-print">
+        <h2>Rooms</h2>
+        <div id="roomList" class="rooms"></div>
+        <button id="addRoom" class="secondary">+ Add room</button>
+      </aside>
+      <div class="grow">
+        <table class="items">
+          <thead><tr>
+            <th>Photo</th><th>Item</th><th>Room</th><th class="num">Price</th>
+            <th>Purchased</th><th>Serial</th><th class="no-print">Actions</th>
+          </tr></thead>
+          <tbody id="itemRows"></tbody>
+        </table>
+
+        <form id="itemForm" class="panel no-print" onsubmit="return false">
+          <h2 id="formTitle">Add item</h2>
+          <div id="formError" class="error"></div>
+          <div class="grid">
+            <label>Item name*<input id="fName" required></label>
+            <label>Room*<select id="fRoom"></select></label>
+            <label>Category<select id="fCat"></select></label>
+            <label>Purchase price ($)*<input id="fPrice" inputmode="decimal" placeholder="499.99"></label>
+            <label>Purchase date<input id="fDate" type="date"></label>
+            <label>Serial number<input id="fSerial"></label>
+          </div>
+          <label>Notes<textarea id="fNotes" rows="2" placeholder="Where bought, warranty info…"></textarea></label>
+          <label>Photo (shrunk to fit 500 KB)<input id="fPhoto" type="file" accept="image/*"></label>
+          <div id="photoPreview"></div>
+          <div class="row">
+            <button id="saveItem" type="button" class="primary">Save item</button>
+            <button id="cancelEdit" type="button" class="secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD TAB -->
+  <section id="tab-dashboard" class="tabpage">
+    <div class="grand panel">
+      <div><div class="muted">Total documented value</div><div id="grandTotal" class="big"></div></div>
+      <div><div class="muted">Items</div><div id="grandCount" class="big"></div></div>
+      <button id="printBtn2" class="no-print" onclick="window.print()">🖨 Print report</button>
+    </div>
+    <div id="dashCards" class="cards"></div>
+  </section>
+
+  <!-- GUIDANCE TAB -->
+  <section id="tab-guidance" class="tabpage">
+    <h2>Make your inventory claim-ready</h2>
+    <div id="guidance" class="guides"></div>
+    <p class="muted small">HomeInventory AI is a documentation tool, not insurance or legal advice. Check your policy for coverage details.</p>
+  </section>
+</main>
+
+<footer class="wrap muted small no-print">
+  100% local — your inventory never leaves this browser. Export CSV or print for an off-site copy.
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
