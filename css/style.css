@@ -15,8 +15,8 @@
   --muted: #8a8175;
   --line: #e7dfcc;
   --line-soft: #f0ebdb;
-  --radius: 14px;
-  --radius-sm: 9px;
+  --radius: 0;
+  --radius-sm: 0;
   --shadow: 0 1px 2px rgba(68, 54, 28, .06), 0 10px 26px rgba(68, 54, 28, .07);
   --shadow-sm: 0 1px 2px rgba(68, 54, 28, .07);
   --red: #b91c1c; --red-soft: #fbe7e5;
@@ -48,13 +48,13 @@ a { color: var(--olive-deep); }
 }
 .brand { display: flex; align-items: center; gap: 11px; font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
 .brand-mark {
-  width: 36px; height: 36px; border-radius: 11px; background: var(--olive); color: #fff;
+  width: 36px; height: 36px; border-radius: 0; background: var(--olive); color: #fff;
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   box-shadow: 0 4px 12px rgba(77, 124, 15, .35);
 }
 .brand em {
   font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px;
-  color: var(--olive-deep); background: var(--olive-soft); border-radius: 6px; padding: 3px 8px; margin-left: 2px;
+  color: var(--olive-deep); background: var(--olive-soft); border-radius: 0; padding: 3px 8px; margin-left: 2px;
 }
 .tagline { color: var(--muted); font-size: 13.5px; margin: 0; padding-bottom: 14px; }
 .tabs { display: flex; gap: 26px; }
@@ -85,14 +85,14 @@ main { padding-top: 26px; padding-bottom: 60px; }
 .binder h2 { font-size: 17px; padding: 0 8px; }
 .rooms { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
 .room {
-  text-align: left; background: none; border: none; border-radius: var(--radius-sm);
+  text-align: left; background: none; border: none; border-radius: 0;
   padding: 9px 12px; font-size: 14px; font-weight: 500; color: var(--ink-soft);
   border-left: 3px solid transparent; transition: background .13s, color .13s, border-color .13s;
   display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
 }
 .room .rcount {
   font-size: 12px; font-weight: 700; color: var(--muted);
-  background: var(--paper-deep); border-radius: 999px; padding: 1px 9px; flex: none;
+  background: var(--paper-deep); border-radius: 0; padding: 1px 9px; flex: none;
 }
 .room:hover { background: var(--paper); }
 .room.active {
@@ -149,7 +149,7 @@ label input, label select, label textarea { margin-top: 6px; font-weight: 400; }
 .ic-body h3 { font-size: 15.5px; letter-spacing: -.1px; }
 .ic-cat {
   align-self: flex-start; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-  color: var(--olive-deep); background: var(--olive-soft); border-radius: 999px; padding: 3px 10px;
+  color: var(--olive-deep); background: var(--olive-soft); border-radius: 0; padding: 3px 10px;
 }
 .ic-price {
   font-family: var(--serif); font-size: 21px; font-weight: 700; color: var(--ink);
@@ -162,7 +162,7 @@ label input, label select, label textarea { margin-top: 6px; font-weight: 400; }
 .ic-notes { font-size: 13px; color: var(--ink-soft); margin: 0; border-top: 1px dashed var(--line); padding-top: 8px; }
 .ic-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 8px; }
 .ic-actions button {
-  border: 1px solid var(--line); background: #fff; border-radius: 8px;
+  border: 1px solid var(--line); background: #fff; border-radius: 0;
   padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--ink-soft);
 }
 .ic-actions button:hover { border-color: var(--olive); color: var(--olive-deep); }
@@ -183,9 +183,9 @@ label input, label select, label textarea { margin-top: 6px; font-weight: 400; }
 }
 .form-head { margin-bottom: 16px; }
 .form-head .muted { margin: 4px 0 0; font-size: 14px; }
-#photoPreview img { max-width: 220px; border-radius: var(--radius-sm); border: 1px solid var(--line); display: block; margin: 4px 0 10px; }
+#photoPreview img { max-width: 220px; border-radius: 0; border: 1px solid var(--line); display: block; margin: 4px 0 10px; }
 #photoPreview button {
-  border: 1px solid var(--line); background: #fff; border-radius: 8px;
+  border: 1px solid var(--line); background: #fff; border-radius: 0;
   padding: 6px 12px; font-size: 13px; color: var(--ink-soft); font-weight: 600;
 }
 
@@ -217,8 +217,8 @@ label input, label select, label textarea { margin-top: 6px; font-weight: 400; }
   font-family: var(--serif); font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .cards .card .muted { font-size: 13px; }
-.vbar { height: 7px; background: var(--paper-deep); border-radius: 999px; margin-top: 12px; overflow: hidden; }
-.vbar span { display: block; height: 100%; background: var(--olive); border-radius: 999px; }
+.vbar { height: 7px; background: var(--paper-deep); border-radius: 0; margin-top: 12px; overflow: hidden; }
+.vbar span { display: block; height: 100%; background: var(--olive); border-radius: 0; }
 
 /* ---------- guidance ---------- */
 .eyebrow {
