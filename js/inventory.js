@@ -181,6 +181,127 @@
       dataUrl.length <= (maxBytes || 500 * 1024);
   }
 
+  /* ---- item sorting ---- */
+  // key: "name" | "price" | "date"; dir: "asc" | "desc"
+  function sortItems(items, key, dir) {
+    var mul = dir === "desc" ? -1 : 1;
+    return items.slice().sort(function (a, b) {
+      var va, vb;
+      if (key === "price") { va = a.price; vb = b.price; }
+      else if (key === "date") { va = a.date || ""; vb = b.date || ""; }
+      else { va = (a.name || "").toLowerCase(); vb = (b.name || "").toLowerCase(); }
+      if (va < vb) return -1 * mul;
+      if (va > vb) return 1 * mul;
+      // tie-break: name, so ordering is deterministic
+      var na = (a.name || "").toLowerCase(), nb = (b.name || "").toLowerCase();
+      if (na < nb) return -1;
+      if (na > nb) return 1;
+      return 0;
+    });
+  }
+
+  /* ---- duplicate an item ---- */
+  function duplicateItem(items, id) {
+    var src = items.filter(function (i) { return i.id === id; })[0];
+    if (!src) return { ok: false, error: "Item not found." };
+    var copy = {
+      id: uid(), roomId: src.roomId, name: src.name + " (copy)",
+      category: src.category, price: src.price, date: src.date,
+      serial: "", notes: src.notes, photo: src.photo
+    };
+    items.push(copy);
+    return { ok: true, item: copy };
+  }
+
+  /* ---- duplicate serial detection (insurers flag conflicting serials) ---- */
+  function findDuplicateSerials(items) {
+    var byKey = {};
+    items.forEach(function (it) {
+      var s = String(it.serial || "").trim();
+      if (!s) return;
+      var k = s.toLowerCase();
+      (byKey[k] || (byKey[k] = { serial: s, items: [] })).items.push(it);
+    });
+    return Object.keys(byKey).map(function (k) { return byKey[k]; })
+      .filter(function (g) { return g.items.length > 1; });
+  }
+
+  /* ---- value by category ---- */
+  function categoryTotals(items) {
+    var cats = {};
+    items.forEach(function (it) {
+      var c = it.category || "Other";
+      var g = cats[c] || (cats[c] = { count: 0, value: 0 });
+      g.count += 1;
+      g.value += it.price;
+    });
+    Object.keys(cats).forEach(function (k) {
+      cats[k].value = Math.round(cats[k].value * 100) / 100;
+    });
+    return cats;
+  }
+
+  /* ---- JSON backup + restore ---- */
+  function makeBackup(rooms, items) {
+    return JSON.stringify({
+      app: "homeinventory-ai", version: 1,
+      exportedAt: new Date().toISOString(),
+      rooms: rooms, items: items
+    });
+  }
+
+  function backupFilename() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return "home-inventory-backup-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + ".json";
+  }
+
+  // Validates a backup payload; returns {ok, rooms, items} or {ok:false, errors[]}.
+  // Ids are kept when present, roomIds that no longer exist fall back to the first room.
+  function parseBackup(jsonText) {
+    var data;
+    try { data = JSON.parse(jsonText); }
+    catch (e) { return { ok: false, errors: ["That file isn't valid JSON."] }; }
+    if (!data || typeof data !== "object") return { ok: false, errors: ["Not a valid backup file."] };
+    var errors = [];
+    if (!Array.isArray(data.rooms)) errors.push("Backup is missing the rooms list.");
+    if (!Array.isArray(data.items)) errors.push("Backup is missing the items list.");
+    if (errors.length) return { ok: false, errors: errors };
+    var rooms = [];
+    data.rooms.forEach(function (r, i) {
+      if (!r || typeof r.name !== "string" || !r.name.trim()) {
+        errors.push("Room #" + (i + 1) + " has no name."); return;
+      }
+      rooms.push({ id: typeof r.id === "string" && r.id ? r.id : uid(), name: r.name.trim() });
+    });
+    if (!rooms.length) rooms.push({ id: uid(), name: "Restored items" });
+    var roomIds = {};
+    rooms.forEach(function (r) { roomIds[r.id] = true; });
+    var items = [];
+    data.items.forEach(function (it, i) {
+      if (!it || typeof it.name !== "string" || !it.name.trim()) {
+        errors.push("Item #" + (i + 1) + " has no name."); return;
+      }
+      var price = Number(it.price);
+      if (!isFinite(price) || price < 0) {
+        errors.push("Item '" + it.name + "' has an invalid price."); return;
+      }
+      items.push({
+        id: typeof it.id === "string" && it.id ? it.id : uid(),
+        roomId: roomIds[it.roomId] ? it.roomId : rooms[0].id,
+        name: it.name.trim(),
+        category: String(it.category || "Other"),
+        price: Math.round(price * 100) / 100,
+        date: String(it.date || ""),
+        serial: String(it.serial || "").trim(),
+        notes: String(it.notes || "").trim(),
+        photo: typeof it.photo === "string" ? it.photo : ""
+      });
+    });
+    if (errors.length) return { ok: false, errors: errors };
+    return { ok: true, rooms: rooms, items: items };
+  }
+
   function exportFilename() {
     var d = new Date();
     function p(n) { return (n < 10 ? "0" : "") + n; }
@@ -192,6 +313,9 @@
     money: money, parseMoney: parseMoney, validISODate: validISODate,
     addRoom: addRoom, addItem: addItem, updateItem: updateItem, deleteItem: deleteItem,
     validateItem: validateItem, totals: totals, search: search,
-    itemsToCSV: itemsToCSV, photoOk: photoOk, exportFilename: exportFilename
+    itemsToCSV: itemsToCSV, photoOk: photoOk, exportFilename: exportFilename,
+    sortItems: sortItems, duplicateItem: duplicateItem,
+    findDuplicateSerials: findDuplicateSerials, categoryTotals: categoryTotals,
+    makeBackup: makeBackup, parseBackup: parseBackup, backupFilename: backupFilename
   };
 });

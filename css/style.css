@@ -294,3 +294,15 @@ footer { text-align: center; padding: 26px 20px; border-top: 1px solid var(--lin
   .cards { grid-template-columns: 1fr 1fr; }
   .vbar { display: none; }
 }
+
+/* ---------- sorting, duplicate serials, backup ---------- */
+.toolbar select { max-width: 210px; }
+.serial-warn {
+  margin: 0 0 14px; padding: 10px 14px;
+  background: #fdf3e7; border: 1px solid #e8c07a; border-left: 4px solid #c98a2b;
+  font-size: 13.5px; color: var(--ink);
+}
+.warnserial {
+  display: inline-block; margin: 2px 6px 2px 0; padding: 2px 8px;
+  background: #fff; border: 1px solid #e8c07a; font-weight: 600;
+}

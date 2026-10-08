@@ -7,7 +7,9 @@
     rooms: HI.storageGet("rooms", null),
     items: HI.storageGet("items", []),
     roomFilter: "all",
-    query: ""
+    query: "",
+    sortKey: "name",
+    sortDir: "asc"
   };
   if (!state.rooms) {
     state.rooms = HID.DEFAULT_ROOMS.map(function (n) { return { id: HI.uid(), name: n }; });
@@ -44,6 +46,22 @@
     document.getElementById("grandTotal").textContent = HI.money(t.grand.value);
     document.getElementById("grandCount").textContent =
       t.grand.count + ' item' + (t.grand.count === 1 ? '' : 's') + ' documented';
+    renderCategoryTotals(grand);
+  }
+
+  function renderCategoryTotals(grand) {
+    var cats = HI.categoryTotals(state.items);
+    var names = Object.keys(cats).sort(function (a, b) { return cats[b].value - cats[a].value; });
+    var html = names.map(function (c) {
+      var g = cats[c];
+      var pct = grand > 0 ? Math.max(2, Math.round((g.value / grand) * 100)) : 0;
+      return '<div class="card"><h3>' + esc(c) + '</h3>' +
+        '<div class="big">' + HI.money(g.value) + '</div>' +
+        '<div class="muted">' + g.count + ' item' + (g.count === 1 ? '' : 's') + '</div>' +
+        '<div class="vbar"><span style="width:' + pct + '%"></span></div></div>';
+    }).join("");
+    document.getElementById("catTotals").innerHTML = html ||
+      '<p class="muted">No items yet — categories will appear here as you add items.</p>';
   }
 
   /* ---------- rooms ---------- */
@@ -64,11 +82,27 @@
   }
 
   /* ---------- items table ---------- */
+  function renderSerialWarning() {
+    var dupes = HI.findDuplicateSerials(state.items);
+    var el = document.getElementById("serialWarn");
+    if (!dupes.length) { el.innerHTML = ""; el.style.display = "none"; return; }
+    el.style.display = "";
+    el.innerHTML = '<strong>⚠ ' + dupes.length + ' serial number' +
+      (dupes.length === 1 ? '' : 's') + ' used on multiple items:</strong> ' +
+      dupes.map(function (g) {
+        return '<span class="warnserial">' + esc(g.serial) + ' (' +
+          g.items.map(function (it) { return esc(it.name); }).join(", ") + ')</span>';
+      }).join(" ") +
+      ' <span class="muted">Insurers flag this — check each item has its own serial.</span>';
+  }
+
   function renderItems() {
     var list = state.items.filter(function (it) {
       return state.roomFilter === "all" || it.roomId === state.roomFilter;
     });
     list = HI.search(list, state.query);
+    list = HI.sortItems(list, state.sortKey, state.sortDir);
+    renderSerialWarning();
     var cards = list.map(function (it) {
       return '<article class="itemcard">' +
         '<div class="ic-photo">' + (it.photo
@@ -85,6 +119,7 @@
         '</dl>' +
         (it.notes ? '<p class="ic-notes">' + esc(it.notes) + '</p>' : '') +
         '<div class="ic-actions"><button data-edit="' + it.id + '">Edit</button> ' +
+        '<button data-dupe="' + it.id + '">Duplicate</button> ' +
         '<button data-del="' + it.id + '" class="danger">Delete</button></div>' +
         '</div></article>';
     }).join("");
@@ -213,15 +248,56 @@
     document.getElementById("itemRows").addEventListener("click", function (e) {
       var eb = e.target.closest("[data-edit]");
       var db = e.target.closest("[data-del]");
+      var pb = e.target.closest("[data-dupe]");
       if (eb) {
         var it = state.items.filter(function (x) { return x.id === eb.dataset.edit; })[0];
         if (it) { fillForm(it); window.scrollTo(0, document.getElementById("itemForm").offsetTop); }
+      } else if (pb) {
+        var res = HI.duplicateItem(state.items, pb.dataset.dupe);
+        if (res.ok) { save(); renderAll(); }
       } else if (db) {
         if (confirm("Delete this item?")) {
           HI.deleteItem(state.items, db.dataset.del);
           save(); renderAll();
         }
       }
+    });
+
+    document.getElementById("sortSel").addEventListener("change", function (e) {
+      var parts = e.target.value.split(":");
+      state.sortKey = parts[0]; state.sortDir = parts[1];
+      renderItems();
+    });
+
+    document.getElementById("exportBackup").addEventListener("click", function () {
+      var json = HI.makeBackup(state.rooms, state.items);
+      var blob = new Blob([json], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = HI.backupFilename();
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    });
+
+    document.getElementById("restoreBtn").addEventListener("click", function () {
+      document.getElementById("restoreFile").click();
+    });
+    document.getElementById("restoreFile").addEventListener("change", function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var res = HI.parseBackup(reader.result);
+        if (!res.ok) { alert("Couldn't restore backup:\n" + res.errors.join("\n")); return; }
+        if (!confirm("Restore will REPLACE your current inventory with " + res.items.length +
+          " items from the backup. Continue?")) return;
+        state.rooms = res.rooms;
+        state.items = res.items;
+        state.roomFilter = "all";
+        save(); renderAll(); fillForm(null);
+      };
+      reader.readAsText(file);
+      e.target.value = "";
     });
 
     document.getElementById("exportCsv").addEventListener("click", function () {

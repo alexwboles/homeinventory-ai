@@ -27,11 +27,22 @@
   <section id="tab-inventory" class="tabpage active">
     <div class="toolbar no-print">
       <input id="search" type="search" placeholder="Search items, serials, notes…">
+      <select id="sortSel" aria-label="Sort items">
+        <option value="name:asc">Name A–Z</option>
+        <option value="price:desc">Price: high → low</option>
+        <option value="price:asc">Price: low → high</option>
+        <option value="date:desc">Newest first</option>
+        <option value="date:asc">Oldest first</option>
+      </select>
       <div class="toolbar-btns">
         <button id="exportCsv" class="secondary">Export CSV</button>
+        <button id="exportBackup" class="secondary">Backup JSON</button>
+        <button id="restoreBtn" class="secondary">Restore</button>
+        <input id="restoreFile" type="file" accept=".json,application/json" hidden>
         <button id="printBtn" class="secondary">Print / PDF</button>
       </div>
     </div>
+    <div id="serialWarn" class="serial-warn no-print" style="display:none"></div>
     <div class="cols">
       <aside class="no-print binder">
         <h2>Rooms</h2>
@@ -82,6 +93,8 @@
     </div>
     <h2 class="section-title">Value by room</h2>
     <div id="dashCards" class="cards"></div>
+    <h2 class="section-title">Value by category</h2>
+    <div id="catTotals" class="cards"></div>
   </section>
 
   <!-- GUIDANCE TAB -->

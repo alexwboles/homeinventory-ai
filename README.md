@@ -12,9 +12,12 @@ HomeInventory AI is a single-page web app (no build step, no dependencies, no ac
 
 1. **Organizes by room** — 8 default rooms, add your own, per-room item counts.
 2. **Captures what matters** — name, category, purchase price, purchase date, serial number, notes, and one photo per item (auto-shrunk to fit a 500 KB cap).
-3. **Dashboards total value** — per-room and grand-total documented value with item counts.
-4. **Exports for insurance** — one-click CSV export plus a print stylesheet that turns the inventory into a clean paper report. Keep a copy off-site!
+3. **Dashboards total value** — per-room, per-category, and grand-total documented value with item counts.
+4. **Exports for insurance** — one-click CSV export, full **JSON backup + restore**, plus a print stylesheet that turns the inventory into a clean paper report. Keep a copy off-site!
 5. **Teaches claim-readiness** — five insurance-documentation guidance notes (photograph everything, keep receipts, update after purchases, off-site copy, replacement cost vs. actual cash value).
+6. **Sorts your items** — name, price, or purchase date, ascending or descending.
+7. **Duplicates items** — one-click clone for multiples (serial cleared so each keeps a unique one).
+8. **Flags duplicate serial numbers** — warns when the same serial appears on multiple items, which insurers flag.
 
 Everything persists in `localStorage`. Optional: set `OPENAI_API_KEY` for AI-assisted item descriptions in a future version — nothing requires it.
 

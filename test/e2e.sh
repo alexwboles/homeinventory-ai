@@ -89,6 +89,47 @@ const r2 = HI.storageGet('rooms', []), i2 = HI.storageGet('items', []);
 (/^home-inventory-\d{8}\.csv$/.test(HI.exportFilename()))
   ? ok('flow10: export filename ' + HI.exportFilename()) : bad('flow10: ' + HI.exportFilename());
 
+// Flow 11: duplicate an item (bulk purchase of identical tools) — serial cleared
+const drillRoom = rooms[rooms.length - 1].id;
+HI.addItem(items, { roomId: drillRoom, name: 'DeWalt Battery', price: '99.00', serial: 'BAT-001' }, rooms);
+const bat = items.filter(i => i.name === 'DeWalt Battery')[0];
+const dupe = HI.duplicateItem(items, bat.id);
+(dupe.ok && dupe.item.serial === '' && /\(copy\)/.test(dupe.item.name) &&
+ items.filter(i => i.name.indexOf('DeWalt Battery') === 0).length === 2)
+  ? ok('flow11: duplicate clones item, clears serial, "(copy)" suffix') : bad('flow11: ' + JSON.stringify(dupe));
+
+// Flow 12: two items sharing a serial raise the duplicate-serial warning
+HI.addItem(items, { roomId: drillRoom, name: 'DeWalt Charger', price: '49.00', serial: 'BAT-001' }, rooms);
+const flags = HI.findDuplicateSerials(items);
+(flags.length === 1 && flags[0].serial === 'BAT-001' && flags[0].items.length === 2)
+  ? ok('flow12: duplicate serial "BAT-001" flagged on 2 items') : bad('flow12: ' + JSON.stringify(flags));
+
+// Flow 13: sort items by price high->low and name A-Z
+const byPrice = HI.sortItems(items, 'price', 'desc');
+const byName = HI.sortItems(items, 'name', 'asc');
+let priceOk = true;
+for (let i = 1; i < byPrice.length; i++) if (byPrice[i - 1].price < byPrice[i].price) priceOk = false;
+let nameOk = true;
+for (let i = 1; i < byName.length; i++)
+  if (byName[i - 1].name.toLowerCase() > byName[i].name.toLowerCase()) nameOk = false;
+(priceOk && nameOk)
+  ? ok('flow13: sort by price desc and name asc both ordered') : bad('flow13');
+
+// Flow 14: category totals + JSON backup/restore full lifecycle
+HI.updateItem(items, bat.id, { category: 'Tools' }, rooms);
+const cats = HI.categoryTotals(items);
+(cats['Tools'] && cats['Tools'].count >= 1 && cats['Tools'].value === 99)
+  ? ok('flow14a: category totals show Tools = $99.00') : bad('flow14a: ' + JSON.stringify(cats));
+const snap = HI.makeBackup(rooms, items);
+const itemCount = items.length;
+items.length = 0; rooms.length = 0; // wipe state like a fresh browser
+const restored = HI.parseBackup(snap);
+if (restored.ok) { rooms = restored.rooms; items = restored.items; }
+(restored.ok && items.length === itemCount && HI.totals(items).grand.count === itemCount)
+  ? ok('flow14b: backup -> wipe -> restore recovers all ' + itemCount + ' items') : bad('flow14b: ' + JSON.stringify(restored.errors || restored));
+const corrupt = HI.parseBackup('{"app":"x"}');
+(!corrupt.ok) ? ok('flow14c: corrupt backup rejected, not applied') : bad('flow14c');
+
 console.log('---');
 console.log('e2e: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
