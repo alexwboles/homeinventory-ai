@@ -308,6 +308,100 @@
     return "home-inventory-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + ".csv";
   }
 
+  /* ---- claim readiness: 3 proof points per item (photo, serial, purchase date) ---- */
+  function itemReadiness(item) {
+    var points = 0, checks = [];
+    if (item && item.photo) { points++; checks.push("photo"); }
+    if (item && item.serial && String(item.serial).trim()) { points++; checks.push("serial"); }
+    if (item && item.date && validISODate(item.date)) { points++; checks.push("date"); }
+    return { points: points, of: 3, pct: Math.round(points / 3 * 100), checks: checks };
+  }
+
+  // Value-weighted readiness: share of total documented value fully proven.
+  // proven value of an item = price * (proof points / 3).
+  function claimReadiness(items) {
+    var total = 0, proven = 0, fully = 0;
+    (items || []).forEach(function (it) {
+      var v = Number(it.price) || 0;
+      total += v;
+      var r = itemReadiness(it);
+      proven += v * (r.points / 3);
+      if (r.points === 3) fully++;
+    });
+    return {
+      total: (items || []).length, fullyDocumented: fully,
+      valuePct: total > 0 ? Math.round(proven / total * 100) : 0
+    };
+  }
+
+  /* ---- actual cash value: straight-line depreciation by category ---- */
+  // Years until an item is fully depreciated (collectibles don't depreciate).
+  var DEPRECIATION_YEARS = {
+    "Electronics": 5, "Appliances": 10, "Furniture": 10, "Jewelry & Watches": 50,
+    "Clothing": 5, "Tools": 10, "Sports & Outdoors": 7, "Musical Instruments": 15,
+    "Collectibles & Art": Infinity, "Kitchenware": 8, "Other": 7
+  };
+  var DEFAULT_DEPRECIATION_YEARS = 7;
+
+  function itemAgeYears(item, asOfISO) {
+    if (!item || !item.date || !validISODate(item.date)) return null;
+    var asOf = asOfISO || (function () {
+      var d = new Date();
+      return d.getFullYear() + "-" + (d.getMonth() + 1 < 10 ? "0" : "") + (d.getMonth() + 1) +
+        "-" + (d.getDate() < 10 ? "0" : "") + d.getDate();
+    })();
+    if (!validISODate(asOf)) return null;
+    var ms = new Date(asOf + "T12:00:00") - new Date(item.date + "T12:00:00");
+    if (isNaN(ms) || ms < 0) return null;
+    return ms / (365.25 * 24 * 3600 * 1000);
+  }
+
+  // Actual cash value = purchase price depreciated straight-line to zero over
+  // the category's life. Returns {ageYears, lifeYears, acv} — ageYears null
+  // when the purchase date is unknown (can't depreciate).
+  function acv(item, asOfISO) {
+    var price = Number(item && item.price) || 0;
+    var life = DEPRECIATION_YEARS[item && item.category] || DEFAULT_DEPRECIATION_YEARS;
+    var age = itemAgeYears(item, asOfISO);
+    if (age == null) return { ageYears: null, lifeYears: life, acv: Math.round(price * 100) / 100 };
+    var factor = Math.max(0, 1 - age / life);
+    return {
+      ageYears: Math.round(age * 10) / 10, lifeYears: life,
+      acv: Math.round(price * factor * 100) / 100
+    };
+  }
+
+  // Portfolio-wide: purchase value vs depreciated (ACV) value.
+  function acvTotals(items, asOfISO) {
+    var purchase = 0, current = 0;
+    (items || []).forEach(function (it) {
+      purchase += Number(it.price) || 0;
+      current += acv(it, asOfISO).acv;
+    });
+    return {
+      purchaseValue: Math.round(purchase * 100) / 100,
+      acvValue: Math.round(current * 100) / 100,
+      depreciation: Math.round((purchase - current) * 100) / 100
+    };
+  }
+
+  /* ---- under-documented high-value items: claim risk list ---- */
+  // Items at/above the value threshold missing at least one proof point.
+  function underDocumented(items, threshold) {
+    var t = threshold == null ? 500 : Number(threshold);
+    if (isNaN(t) || t < 0) t = 500;
+    return (items || [])
+      .filter(function (it) {
+        return (Number(it.price) || 0) >= t && itemReadiness(it).points < 3;
+      })
+      .map(function (it) {
+        var r = itemReadiness(it);
+        var missing = ["photo", "serial", "date"].filter(function (k) { return r.checks.indexOf(k) === -1; });
+        return { item: it, missing: missing, readiness: r.pct };
+      })
+      .sort(function (a, b) { return (Number(b.item.price) || 0) - (Number(a.item.price) || 0); });
+  }
+
   return {
     uid: uid, storageGet: storageGet, storageSet: storageSet,
     money: money, parseMoney: parseMoney, validISODate: validISODate,
@@ -316,6 +410,9 @@
     itemsToCSV: itemsToCSV, photoOk: photoOk, exportFilename: exportFilename,
     sortItems: sortItems, duplicateItem: duplicateItem,
     findDuplicateSerials: findDuplicateSerials, categoryTotals: categoryTotals,
-    makeBackup: makeBackup, parseBackup: parseBackup, backupFilename: backupFilename
+    makeBackup: makeBackup, parseBackup: parseBackup, backupFilename: backupFilename,
+    itemReadiness: itemReadiness, claimReadiness: claimReadiness,
+    acv: acv, acvTotals: acvTotals, DEPRECIATION_YEARS: DEPRECIATION_YEARS,
+    underDocumented: underDocumented
   };
 });

@@ -24,8 +24,8 @@ grep -q 'js/data.js' index.html && grep -q 'js/inventory.js' index.html && grep 
 # 4. print CSS present for insurance export
 grep -q '@media print' css/style.css && ok "print stylesheet present" || bad "no @media print"
 
-# 4b. new UI elements wired (sort, backup/restore, serial warning, category totals, duplicate)
-for id in sortSel exportBackup restoreBtn restoreFile serialWarn catTotals; do
+# 4b. new UI elements wired (sort, backup/restore, serial warning, category totals, duplicate, readiness, ACV, risk list)
+for id in sortSel exportBackup restoreBtn restoreFile serialWarn catTotals readinessPct acvTotal riskList; do
   grep -q "id=\"$id\"" index.html && ok "index.html has #$id" || bad "index.html missing #$id"
 done
 grep -q 'data-dupe' js/app.js && ok "app.js wires Duplicate button" || bad "app.js missing duplicate wiring"
@@ -155,6 +155,46 @@ const orph = HI.parseBackup(JSON.stringify({ rooms: [{ id: 'r1', name: 'Kitchen'
   items: [{ id: 'i1', roomId: 'gone', name: 'Lamp', price: 10 }] }));
 (orph.ok && orph.items[0].roomId === 'r1')
   ? ok('parseBackup: orphan roomId falls back to first room') : bad('parseBackup orphan fallback');
+
+// ---- claim readiness ----
+const rFull = HI.itemReadiness({ photo: 'data:x', serial: 'SN1', date: '2024-01-01' });
+const rNone = HI.itemReadiness({ name: 'Lamp', price: 50 });
+const rPart = HI.itemReadiness({ serial: 'SN2' });
+(rFull.points === 3 && rNone.points === 0 && rPart.points === 1 && rPart.pct === 33)
+  ? ok('itemReadiness: 3/0/1 proof points scored') : bad('itemReadiness: ' + JSON.stringify([rFull, rNone, rPart]));
+const cr = HI.claimReadiness([
+  { name: 'TV', price: 1000, photo: 'data:x', serial: 'S1', date: '2024-01-01' },
+  { name: 'Lamp', price: 100 }
+]);
+// TV fully proven ($1000), Lamp nothing: proven value = 1000/1100
+(cr.fullyDocumented === 1 && cr.total === 2 && cr.valuePct === 91)
+  ? ok('claimReadiness: 1 of 2 fully proven, 91% of value proven') : bad('claimReadiness: ' + JSON.stringify(cr));
+
+// ---- actual cash value (depreciation) ----
+const aNew = HI.acv({ name: 'TV', price: 1000, category: 'Electronics', date: '2026-01-01' }, '2026-10-12');
+const aOld = HI.acv({ name: 'TV', price: 1000, category: 'Electronics', date: '2016-01-01' }, '2026-10-12');
+const aNoDate = HI.acv({ name: 'TV', price: 1000, category: 'Electronics' }, '2026-10-12');
+const aArt = HI.acv({ name: 'Painting', price: 2000, category: 'Collectibles & Art', date: '2000-01-01' }, '2026-10-12');
+(aNew.acv > 800 && aNew.acv <= 1000 && aOld.acv === 0 && aNoDate.acv === 1000 && aArt.acv === 2000)
+  ? ok('acv: recent TV keeps most value, 10-yr-old TV fully depreciated, no-date keeps price, art holds')
+  : bad('acv: ' + JSON.stringify([aNew, aOld, aNoDate, aArt]));
+const at = HI.acvTotals([
+  { name: 'TV', price: 1000, category: 'Electronics', date: '2021-10-12' },
+  { name: 'Sofa', price: 500, category: 'Furniture', date: '2021-10-12' }
+], '2026-10-12');
+// TV: 5yr life, ~5yr old -> ~0; Sofa: 10yr life, ~5yr old -> ~250
+(at.purchaseValue === 1500 && at.acvValue < 260 && at.acvValue >= 240 && Math.abs(at.depreciation - (1500 - at.acvValue)) < 0.01)
+  ? ok('acvTotals: purchase $1,500, ACV ~$250, depreciation reconciles') : bad('acvTotals: ' + JSON.stringify(at));
+
+// ---- under-documented high-value items ----
+const risks = HI.underDocumented([
+  { name: 'TV', price: 2000, serial: 'S1' },                       // missing photo+date
+  { name: 'Ring', price: 5000, photo: 'data:x', serial: 'R1', date: '2024-01-01' }, // fully proven
+  { name: 'Lamp', price: 50 }                                      // below threshold
+], 500);
+(risks.length === 1 && risks[0].item.name === 'TV' &&
+ risks[0].missing.join(',') === 'photo,date')
+  ? ok('underDocumented: only the $2,000 TV flagged, missing photo+date') : bad('underDocumented: ' + JSON.stringify(risks));
 process.exit(fail ? 1 : 0);
 NODEEOF
 [ "$?" -eq 0 ] && ok "node logic checks all green" || bad "node logic checks failed"

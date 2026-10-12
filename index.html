@@ -91,10 +91,26 @@
         <button id="printBtn2" onclick="window.print()">Print report</button>
       </div>
     </div>
+    <h2 class="section-title">Claim readiness</h2>
+    <div class="grand panel">
+      <div class="grand-figure">
+        <div class="muted">Share of value fully proven (photo + serial + date)</div>
+        <div id="readinessPct" class="big"></div>
+        <div class="muted"><span id="readinessDetail"></span></div>
+      </div>
+      <div class="grand-figure">
+        <div class="muted">Actual cash value (depreciated)</div>
+        <div id="acvTotal" class="big"></div>
+        <div class="muted"><span id="acvDetail"></span></div>
+      </div>
+    </div>
     <h2 class="section-title">Value by room</h2>
     <div id="dashCards" class="cards"></div>
     <h2 class="section-title">Value by category</h2>
     <div id="catTotals" class="cards"></div>
+    <h2 class="section-title">Under-documented valuables</h2>
+    <p class="muted small">Items worth $500+ missing photo, serial, or purchase date — the ones insurers question first.</p>
+    <div id="riskList" class="cards"></div>
   </section>
 
   <!-- GUIDANCE TAB -->

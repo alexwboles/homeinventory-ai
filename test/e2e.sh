@@ -130,6 +130,24 @@ if (restored.ok) { rooms = restored.rooms; items = restored.items; }
 const corrupt = HI.parseBackup('{"app":"x"}');
 (!corrupt.ok) ? ok('flow14c: corrupt backup rejected, not applied') : bad('flow14c');
 
+// Flow 15: claim readiness — value-weighted proof score
+const rd = HI.claimReadiness(items);
+(rd.total === items.length && rd.valuePct >= 0 && rd.valuePct <= 100 && rd.fullyDocumented <= rd.total)
+  ? ok('flow15: claim readiness ' + rd.valuePct + '% over ' + rd.total + ' items') : bad('flow15: ' + JSON.stringify(rd));
+
+// Flow 16: ACV depreciation — a 2021 TV is worth less than its receipt price
+const tv16 = items.filter(i => i.name === 'OLED TV')[0];
+HI.updateItem(items, tv16.id, { date: '2021-06-01', category: 'Electronics' }, rooms);
+const acv16 = HI.acv(tv16, '2026-10-12');
+(acv16.acv < tv16.price && acv16.acv >= 0)
+  ? ok('flow16: 2021 TV $' + tv16.price + ' -> ACV $' + acv16.acv) : bad('flow16: ' + JSON.stringify(acv16));
+
+// Flow 17: under-documented valuables flag the pricey unproven item
+const risks17 = HI.underDocumented(items, 500);
+(risks17.length >= 1 && risks17.every(r => r.missing.length > 0))
+  ? ok('flow17: ' + risks17.length + ' under-documented valuable(s) flagged with missing proof points')
+  : bad('flow17: ' + JSON.stringify(risks17.map(r => r.item.name)));
+
 console.log('---');
 console.log('e2e: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

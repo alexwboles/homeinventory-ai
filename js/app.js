@@ -46,7 +46,30 @@
     document.getElementById("grandTotal").textContent = HI.money(t.grand.value);
     document.getElementById("grandCount").textContent =
       t.grand.count + ' item' + (t.grand.count === 1 ? '' : 's') + ' documented';
+    renderReadiness();
     renderCategoryTotals(grand);
+    renderRiskList();
+  }
+
+  function renderReadiness() {
+    var r = HI.claimReadiness(state.items);
+    var a = HI.acvTotals(state.items);
+    document.getElementById("readinessPct").textContent = r.valuePct + '%';
+    document.getElementById("readinessDetail").textContent =
+      r.fullyDocumented + ' of ' + r.total + ' items fully proven';
+    document.getElementById("acvTotal").textContent = HI.money(a.acvValue);
+    document.getElementById("acvDetail").textContent =
+      'Purchase value ' + HI.money(a.purchaseValue) + ' · depreciation ' + HI.money(a.depreciation);
+  }
+
+  function renderRiskList() {
+    var risks = HI.underDocumented(state.items, 500);
+    var el = document.getElementById("riskList");
+    el.innerHTML = risks.length ? risks.map(function (x) {
+      return '<div class="card"><span class="ic-cat">Claim risk</span><h3>' + esc(x.item.name) + '</h3>' +
+        '<div class="big">' + HI.money(x.item.price) + '</div>' +
+        '<div class="muted">Missing: ' + esc(x.missing.join(', ')) + ' · ' + esc(roomName(x.item.roomId)) + '</div></div>';
+    }).join("") : '<p class="muted">No high-value items are missing proof. Nice — your claim file is solid.</p>';
   }
 
   function renderCategoryTotals(grand) {
