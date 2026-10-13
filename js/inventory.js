@@ -62,7 +62,8 @@
     var n = String(name || "").trim();
     if (!n) return { ok: false, error: "Room name is required." };
     if (rooms.some(function (r) { return r.name.toLowerCase() === n.toLowerCase(); }))
-      return { ok: false, error: "That room already exists." };
+
+  return { ok: false, error: "That room already exists." };
     var room = { id: uid(), name: n };
     rooms.push(room);
     return { ok: true, room: room };
@@ -286,6 +287,30 @@
       if (!isFinite(price) || price < 0) {
         errors.push("Item '" + it.name + "' has an invalid price."); return;
       }
+      var wl = Number(it.warrantyMonths);
+      var serviceLog = [];
+      if (Array.isArray(it.serviceLog)) {
+        it.serviceLog.forEach(function (e) {
+          if (!e || !validISODate(e.date) || !String(e.description || "").trim()) return;
+          var c = (e.cost === "" || e.cost == null) ? null : Number(e.cost);
+          serviceLog.push({
+            id: typeof e.id === "string" && e.id ? e.id : uid(),
+            date: e.date,
+            description: String(e.description).trim(),
+            cost: (c !== null && isFinite(c) && c >= 0) ? Math.round(c * 100) / 100 : null
+          });
+        });
+      }
+      var loan = null;
+      if (it.loan && String(it.loan.to || "").trim()) {
+        var ldate = String(it.loan.date || "");
+        var ldue = String(it.loan.dueBack || "");
+        loan = {
+          to: String(it.loan.to).trim(),
+          date: validISODate(ldate) ? ldate : "",
+          dueBack: validISODate(ldue) ? ldue : ""
+        };
+      }
       items.push({
         id: typeof it.id === "string" && it.id ? it.id : uid(),
         roomId: roomIds[it.roomId] ? it.roomId : rooms[0].id,
@@ -295,7 +320,10 @@
         date: String(it.date || ""),
         serial: String(it.serial || "").trim(),
         notes: String(it.notes || "").trim(),
-        photo: typeof it.photo === "string" ? it.photo : ""
+        photo: typeof it.photo === "string" ? it.photo : "",
+        warrantyMonths: (isFinite(wl) && wl > 0 && wl <= 120) ? Math.round(wl) : null,
+        serviceLog: serviceLog,
+        loan: loan
       });
     });
     if (errors.length) return { ok: false, errors: errors };
@@ -402,6 +430,135 @@
       .sort(function (a, b) { return (Number(b.item.price) || 0) - (Number(a.item.price) || 0); });
   }
 
+      /* ---- warranties ---- */
+  function _pad(n) { return (n < 10 ? "0" : "") + n; }
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + _pad(d.getMonth() + 1) + "-" + _pad(d.getDate());
+  }
+
+  function findItem(items, id) {
+    return (items || []).filter(function (x) { return x.id === id; })[0] || null;
+  }
+
+  // Warranty length in months (null = none tracked). 0–120 sanity range.
+  function setWarrantyMonths(items, id, months) {
+    var it = findItem(items, id);
+    if (!it) return { ok: false, error: "Item not found." };
+    var m = (months === "" || months == null) ? null : Number(months);
+    if (m !== null && (!isFinite(m) || m < 0 || m > 120))
+      return { ok: false, error: "Warranty must be 0–120 months." };
+    it.warrantyMonths = (m == null || m === 0) ? null : Math.round(m);
+    return { ok: true, item: it };
+  }
+
+  // Expiry date from purchase date + warranty months (null when unknown).
+  function warrantyExpiry(item) {
+    if (!item || !item.date || !validISODate(item.date) || !(item.warrantyMonths > 0)) return null;
+    var d = new Date(item.date + "T12:00:00");
+    d.setMonth(d.getMonth() + item.warrantyMonths);
+    return d.getFullYear() + "-" + _pad(d.getMonth() + 1) + "-" + _pad(d.getDate());
+  }
+
+  // {status: "none"|"active"|"expiring"|"expired", expiry, daysLeft}
+  // "expiring" = 90 days or fewer left; expired items are still reported.
+  function warrantyStatus(item, asOfISO) {
+    var exp = warrantyExpiry(item);
+    if (!exp) return { status: "none", expiry: null, daysLeft: null };
+    var asOf = (asOfISO && validISODate(asOfISO)) ? asOfISO : todayISO();
+    var days = Math.round((new Date(exp + "T12:00:00") - new Date(asOf + "T12:00:00")) / 864e5);
+    var status = days < 0 ? "expired" : (days <= 90 ? "expiring" : "active");
+    return { status: status, expiry: exp, daysLeft: days };
+  }
+
+  // Items whose warranty expires within `withinDays` (default 90), plus items
+  // that expired in the last 30 days (grace window for claims paperwork).
+  function warrantyAlerts(items, withinDays, asOfISO) {
+    var w = (withinDays == null) ? 90 : Number(withinDays);
+    if (!isFinite(w) || w < 0) w = 90;
+    return (items || []).map(function (it) {
+      return { item: it, w: warrantyStatus(it, asOfISO) };
+    }).filter(function (x) {
+      return x.w.status === "expiring" ||
+             (x.w.status === "expired" && x.w.daysLeft >= -30);
+    }).sort(function (a, b) { return a.w.daysLeft - b.w.daysLeft; });
+  }
+
+  /* ---- maintenance / service log ---- */
+  function logService(items, id, entry) {
+    var it = findItem(items, id);
+    if (!it) return { ok: false, error: "Item not found." };
+    entry = entry || {};
+    var date = String(entry.date || "");
+    if (!validISODate(date)) return { ok: false, error: "Service date must be YYYY-MM-DD." };
+    var desc = String(entry.description || "").trim();
+    if (!desc) return { ok: false, error: "Describe the service performed." };
+    var cost = (entry.cost === "" || entry.cost == null) ? null : Number(entry.cost);
+    if (cost !== null && (!isFinite(cost) || cost < 0))
+      return { ok: false, error: "Service cost must be a positive number." };
+    it.serviceLog = it.serviceLog || [];
+    it.serviceLog.push({ id: uid(), date: date, description: desc, cost: cost });
+    return { ok: true, item: it };
+  }
+
+  function serviceHistory(item) {
+    return ((item && item.serviceLog) || []).slice()
+      .sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  }
+
+  function lastService(item) {
+    var h = serviceHistory(item);
+    return h.length ? h[0] : null;
+  }
+
+  function totalServiceCost(item) {
+    var sum = serviceHistory(item).reduce(function (s, e) { return s + (Number(e.cost) || 0); }, 0);
+    return Math.round(sum * 100) / 100;
+  }
+
+  function deleteService(items, itemId, entryId) {
+    var it = findItem(items, itemId);
+    if (!it || !it.serviceLog) return false;
+    var i = it.serviceLog.findIndex(function (e) { return e.id === entryId; });
+    if (i === -1) return false;
+    it.serviceLog.splice(i, 1);
+    return true;
+  }
+
+  /* ---- loan tracker ---- */
+  function loanItem(items, id, loan) {
+    var it = findItem(items, id);
+    if (!it) return { ok: false, error: "Item not found." };
+    if (it.loan) return { ok: false, error: "That item is already on loan to " + it.loan.to + "." };
+    loan = loan || {};
+    var to = String(loan.to || "").trim();
+    if (!to) return { ok: false, error: "Say who borrowed it." };
+    var date = String(loan.date || todayISO());
+    if (!validISODate(date)) return { ok: false, error: "Loan date must be YYYY-MM-DD." };
+    var dueBack = String(loan.dueBack || "");
+    if (dueBack && !validISODate(dueBack)) return { ok: false, error: "Due-back date must be YYYY-MM-DD." };
+    it.loan = { to: to, date: date, dueBack: dueBack };
+    return { ok: true, item: it };
+  }
+
+  function returnItem(items, id) {
+    var it = findItem(items, id);
+    if (!it) return { ok: false, error: "Item not found." };
+    if (!it.loan) return { ok: false, error: "That item isn't on loan." };
+    delete it.loan;
+    return { ok: true, item: it };
+  }
+
+  // All loaned items, overdue first. Overdue = dueBack date has passed.
+  function loanedItems(items, asOfISO) {
+    var asOf = (asOfISO && validISODate(asOfISO)) ? asOfISO : todayISO();
+    return (items || []).filter(function (it) { return !!it.loan; })
+      .map(function (it) {
+        return { item: it, overdue: !!(it.loan.dueBack && it.loan.dueBack < asOf) };
+      })
+      .sort(function (a, b) { return (a.overdue === b.overdue) ? 0 : (a.overdue ? -1 : 1); });
+  }
+
   return {
     uid: uid, storageGet: storageGet, storageSet: storageSet,
     money: money, parseMoney: parseMoney, validISODate: validISODate,
@@ -413,6 +570,13 @@
     makeBackup: makeBackup, parseBackup: parseBackup, backupFilename: backupFilename,
     itemReadiness: itemReadiness, claimReadiness: claimReadiness,
     acv: acv, acvTotals: acvTotals, DEPRECIATION_YEARS: DEPRECIATION_YEARS,
-    underDocumented: underDocumented
+    underDocumented: underDocumented,
+    todayISO: todayISO, findItem: findItem,
+    setWarrantyMonths: setWarrantyMonths, warrantyExpiry: warrantyExpiry,
+    warrantyStatus: warrantyStatus, warrantyAlerts: warrantyAlerts,
+    logService: logService, serviceHistory: serviceHistory,
+    lastService: lastService, totalServiceCost: totalServiceCost,
+    deleteService: deleteService,
+    loanItem: loanItem, returnItem: returnItem, loanedItems: loanedItems
   };
 });

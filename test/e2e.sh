@@ -148,6 +148,43 @@ const risks17 = HI.underDocumented(items, 500);
   ? ok('flow17: ' + risks17.length + ' under-documented valuable(s) flagged with missing proof points')
   : bad('flow17: ' + JSON.stringify(risks17.map(r => r.item.name)));
 
+// Flow 18: warranty lifecycle — set, expiry math, expiring-soon alert
+const wroom18 = HI.addRoom([], 'Kitchen').room;
+const wItems18 = [];
+const wi18 = HI.addItem(wItems18, { roomId: wroom18.id, name: 'Fridge', category: 'Appliances', price: '1200', date: '2024-06-01' }, [wroom18]);
+HI.setWarrantyMonths(wItems18, wi18.item.id, 36);
+(HI.warrantyExpiry(wi18.item) === '2027-06-01')
+  ? ok('flow18: 36-month warranty on 2024-06-01 fridge expires 2027-06-01') : bad('flow18: ' + HI.warrantyExpiry(wi18.item));
+const alerts18 = HI.warrantyAlerts(wItems18, 90, '2027-04-01');
+(alerts18.length === 1 && alerts18[0].w.status === 'expiring' && alerts18[0].w.daysLeft === 61)
+  ? ok('flow18b: alert fires 61 days before expiry') : bad('flow18b: ' + JSON.stringify(alerts18));
+
+// Flow 19: service log tells the maintenance story
+HI.logService(wItems18, wi18.item.id, { date: '2025-06-01', description: 'Compressor check', cost: '89' });
+HI.logService(wItems18, wi18.item.id, { date: '2026-06-01', description: 'Seal replaced', cost: '45.50' });
+const hist19 = HI.serviceHistory(wi18.item);
+(hist19.length === 2 && hist19[0].date === '2026-06-01' && HI.totalServiceCost(wi18.item) === 134.5)
+  ? ok('flow19: 2 service records, newest first, $134.50 total') : bad('flow19: ' + JSON.stringify(hist19));
+
+// Flow 20: loan tracker — out, overdue, back
+const loan20 = HI.loanItem(wItems18, wi18.item.id, { to: 'Cousin Al', dueBack: '2026-09-01' });
+const loans20 = HI.loanedItems(wItems18, '2026-10-13');
+(loan20.ok && loans20.length === 1 && loans20[0].overdue === true)
+  ? ok('flow20: fridge on loan to Cousin Al, overdue past 2026-09-01') : bad('flow20');
+HI.returnItem(wItems18, wi18.item.id);
+(HI.loanedItems(wItems18, '2026-10-13').length === 0)
+  ? ok('flow20b: returned — loan list clear') : bad('flow20b');
+
+// Flow 21: backup round-trips the new fields
+const json21 = HI.makeBackup([wroom18], wItems18);
+const back21 = HI.parseBackup(json21);
+(back21.ok && back21.items[0].warrantyMonths === 36 &&
+ back21.items[0].serviceLog.length === 2 && back21.items[0].loan === null)
+  ? ok('flow21: backup keeps warranty + service log, loan was returned') : bad('flow21');
+const corrupt21 = HI.parseBackup(JSON.stringify({ app: 'x', rooms: [], items: [{ name: 'x', price: 1, serviceLog: 'junk', loan: { to: '' }, warrantyMonths: 999 }] }));
+(corrupt21.ok && corrupt21.items[0].warrantyMonths === null && corrupt21.items[0].serviceLog.length === 0 && corrupt21.items[0].loan === null)
+  ? ok('flow21b: junk warranty/service/loan data sanitized on restore') : bad('flow21b: ' + JSON.stringify(corrupt21));
+
 console.log('---');
 console.log('e2e: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

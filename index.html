@@ -65,10 +65,33 @@
             <label>Purchase price ($)*<input id="fPrice" inputmode="decimal" placeholder="499.99"></label>
             <label>Purchase date<input id="fDate" type="date"></label>
             <label>Serial number<input id="fSerial"></label>
+            <label>Warranty (months)<input id="fWarranty" inputmode="numeric" placeholder="e.g. 24"></label>
           </div>
           <label>Notes<textarea id="fNotes" rows="2" placeholder="Where bought, warranty info…"></textarea></label>
           <label>Photo (shrunk to fit 500 KB)<input id="fPhoto" type="file" accept="image/*"></label>
           <div id="photoPreview"></div>
+          <div id="serviceSection">
+            <h3>Service history</h3>
+            <div id="serviceList"></div>
+            <div class="grid">
+              <label>Service date<input id="sDate" type="date"></label>
+              <label>What was done<input id="sDesc" placeholder="e.g. Replaced heating element"></label>
+              <label>Cost ($)<input id="sCost" inputmode="decimal" placeholder="0.00"></label>
+            </div>
+            <button id="addService" type="button" class="secondary">Add service record</button>
+          </div>
+          <div id="loanSection">
+            <h3>Loan tracker</h3>
+            <div id="loanStatus"></div>
+            <div id="loanForm" class="grid">
+              <label>Borrowed by<input id="lTo" placeholder="e.g. Neighbor Jane"></label>
+              <label>Due back<input id="lDue" type="date"></label>
+            </div>
+            <div class="row">
+              <button id="loanOut" type="button" class="secondary">Loan out</button>
+              <button id="loanBack" type="button" class="secondary">Mark returned</button>
+            </div>
+          </div>
           <div class="row">
             <button id="saveItem" type="button" class="primary">Save item</button>
             <button id="cancelEdit" type="button" class="secondary">Cancel</button>
@@ -111,6 +134,12 @@
     <h2 class="section-title">Under-documented valuables</h2>
     <p class="muted small">Items worth $500+ missing photo, serial, or purchase date — the ones insurers question first.</p>
     <div id="riskList" class="cards"></div>
+    <h2 class="section-title">Warranties expiring soon</h2>
+    <p class="muted small">Coverage running out in the next 90 days, plus items that expired in the last 30.</p>
+    <div id="warrantyList" class="cards"></div>
+    <h2 class="section-title">On loan</h2>
+    <p class="muted small">Items currently borrowed — overdue ones surface first.</p>
+    <div id="loanList" class="cards"></div>
   </section>
 
   <!-- GUIDANCE TAB -->

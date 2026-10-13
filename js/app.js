@@ -49,6 +49,8 @@
     renderReadiness();
     renderCategoryTotals(grand);
     renderRiskList();
+    renderWarranties();
+    renderLoans();
   }
 
   function renderReadiness() {
@@ -60,6 +62,33 @@
     document.getElementById("acvTotal").textContent = HI.money(a.acvValue);
     document.getElementById("acvDetail").textContent =
       'Purchase value ' + HI.money(a.purchaseValue) + ' · depreciation ' + HI.money(a.depreciation);
+  }
+
+  function renderWarranties() {
+    var alerts = HI.warrantyAlerts(state.items, 90);
+    var el = document.getElementById("warrantyList");
+    el.innerHTML = alerts.length ? alerts.map(function (x) {
+      var when = x.w.status === "expired"
+        ? "Expired " + x.w.expiry + " (" + Math.abs(x.w.daysLeft) + "d ago)"
+        : "Expires " + x.w.expiry + " (" + x.w.daysLeft + "d left)";
+      return '<div class="card"><span class="ic-cat">' + (x.w.status === "expired" ? "Warranty expired" : "Warranty expiring") + '</span>' +
+        '<h3>' + esc(x.item.name) + '</h3>' +
+        '<div class="big">' + HI.money(x.item.price) + '</div>' +
+        '<div class="muted">' + esc(when) + ' · ' + esc(roomName(x.item.roomId)) + '</div></div>';
+    }).join("") : '<p class="muted">No warranties expiring soon.</p>';
+  }
+
+  function renderLoans() {
+    var loans = HI.loanedItems(state.items);
+    var el = document.getElementById("loanList");
+    el.innerHTML = loans.length ? loans.map(function (x) {
+      return '<div class="card"><span class="ic-cat">' + (x.overdue ? "Overdue" : "On loan") + '</span>' +
+        '<h3>' + esc(x.item.name) + '</h3>' +
+        '<div class="big">' + HI.money(x.item.price) + '</div>' +
+        '<div class="muted">Borrowed by ' + esc(x.item.loan.to) +
+        (x.item.loan.dueBack ? ' · due back ' + esc(x.item.loan.dueBack) + (x.overdue ? ' — overdue' : '') : '') +
+        ' · ' + esc(roomName(x.item.roomId)) + '</div></div>';
+    }).join("") : '<p class="muted">Nothing is on loan right now.</p>';
   }
 
   function renderRiskList() {
@@ -105,6 +134,28 @@
   }
 
   /* ---------- items table ---------- */
+  function warrantyRow(it) {
+    var w = HI.warrantyStatus(it);
+    if (w.status === "none") return "";
+    var txt = w.status === "expired"
+      ? "Expired " + w.expiry
+      : "Until " + w.expiry + " (" + w.daysLeft + "d)";
+    return '<div><dt>Warranty</dt><dd class="' + (w.status === "active" ? "" : "warn") + '">' + esc(txt) + '</dd></div>';
+  }
+
+  function loanRow(it) {
+    if (!it.loan) return "";
+    var overdue = !!(it.loan.dueBack && it.loan.dueBack < HI.todayISO());
+    return '<div><dt>On loan</dt><dd class="' + (overdue ? "warn" : "") + '">' + esc(it.loan.to) +
+      (it.loan.dueBack ? " · due " + esc(it.loan.dueBack) + (overdue ? " — overdue" : "") : "") + '</dd></div>';
+  }
+
+  function serviceRow(it) {
+    var h = HI.serviceHistory(it);
+    if (!h.length) return "";
+    return '<div><dt>Service</dt><dd>' + h.length + ' record' + (h.length === 1 ? '' : 's') +
+      ' · last ' + esc(h[0].date) + ' · ' + HI.money(HI.totalServiceCost(it)) + ' total</dd></div>';
+  }
   function renderSerialWarning() {
     var dupes = HI.findDuplicateSerials(state.items);
     var el = document.getElementById("serialWarn");
@@ -139,6 +190,7 @@
         '<div><dt>Room</dt><dd>' + esc(roomName(it.roomId)) + '</dd></div>' +
         '<div><dt>Purchased</dt><dd>' + esc(it.date || "—") + '</dd></div>' +
         '<div><dt>Serial</dt><dd>' + esc(it.serial || "—") + '</dd></div>' +
+        warrantyRow(it) + loanRow(it) + serviceRow(it) +
         '</dl>' +
         (it.notes ? '<p class="ic-notes">' + esc(it.notes) + '</p>' : '') +
         '<div class="ic-actions"><button data-edit="' + it.id + '">Edit</button> ' +
@@ -188,9 +240,45 @@
     document.getElementById("photoPreview").innerHTML =
       pendingPhoto ? '<img src="' + pendingPhoto + '" alt="">' : "";
     document.getElementById("fPhoto").value = "";
+    document.getElementById("fWarranty").value = it && it.warrantyMonths ? it.warrantyMonths : "";
     document.getElementById("formTitle").textContent = it ? "Edit item" : "Add item";
     document.getElementById("saveItem").dataset.editing = it ? it.id : "";
     document.getElementById("formError").textContent = "";
+    renderServiceSection(it);
+    renderLoanSection(it);
+  }
+
+  function renderServiceSection(it) {
+    var sec = document.getElementById("serviceSection");
+    if (!it) { sec.style.display = "none"; return; }
+    sec.style.display = "";
+    var h = HI.serviceHistory(it);
+    document.getElementById("serviceList").innerHTML = h.length ? h.map(function (e) {
+      return '<div class="srow"><span>' + esc(e.date) + '</span><span>' + esc(e.description) + '</span>' +
+        '<span>' + (e.cost != null ? HI.money(e.cost) : "—") + '</span>' +
+        '<button type="button" data-delservice="' + e.id + '" class="danger small">Remove</button></div>';
+    }).join("") +
+      '<div class="muted small">Total spent on service: ' + HI.money(HI.totalServiceCost(it)) + '</div>'
+      : '<p class="muted small">No service records yet.</p>';
+  }
+
+  function renderLoanSection(it) {
+    var sec = document.getElementById("loanSection");
+    if (!it) { sec.style.display = "none"; return; }
+    sec.style.display = "";
+    var st = document.getElementById("loanStatus");
+    var form = document.getElementById("loanForm");
+    var outBtn = document.getElementById("loanOut");
+    var backBtn = document.getElementById("loanBack");
+    if (it.loan) {
+      st.innerHTML = '<p><strong>On loan to ' + esc(it.loan.to) + '</strong> since ' + esc(it.loan.date || "—") +
+        (it.loan.dueBack ? ', due back ' + esc(it.loan.dueBack) : '') + '</p>';
+      form.style.display = "none"; outBtn.style.display = "none"; backBtn.style.display = "";
+      document.getElementById("lTo").value = ""; document.getElementById("lDue").value = "";
+    } else {
+      st.innerHTML = '<p class="muted small">Not currently on loan.</p>';
+      form.style.display = ""; outBtn.style.display = ""; backBtn.style.display = "none";
+    }
   }
 
   /* ---------- events ---------- */
@@ -263,10 +351,58 @@
         document.getElementById("formError").textContent = res.errors.join(" ");
         return;
       }
+      var wres = HI.setWarrantyMonths(state.items, res.item.id,
+        document.getElementById("fWarranty").value);
+      if (!wres.ok) {
+        document.getElementById("formError").textContent = wres.error;
+        return;
+      }
       save(); renderAll(); fillForm(null);
     });
 
     document.getElementById("cancelEdit").addEventListener("click", function () { fillForm(null); });
+
+    document.getElementById("addService").addEventListener("click", function () {
+      var editing = document.getElementById("saveItem").dataset.editing;
+      if (!editing) { alert("Save the item first, then add service records."); return; }
+      var res = HI.logService(state.items, editing, {
+        date: document.getElementById("sDate").value,
+        description: document.getElementById("sDesc").value,
+        cost: document.getElementById("sCost").value
+      });
+      if (!res.ok) { alert(res.error); return; }
+      document.getElementById("sDate").value = "";
+      document.getElementById("sDesc").value = "";
+      document.getElementById("sCost").value = "";
+      save(); renderServiceSection(res.item); renderAll();
+    });
+
+    document.getElementById("serviceList").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-delservice]");
+      if (!b) return;
+      var editing = document.getElementById("saveItem").dataset.editing;
+      if (HI.deleteService(state.items, editing, b.dataset.delservice)) {
+        save(); renderServiceSection(HI.findItem(state.items, editing)); renderAll();
+      }
+    });
+
+    document.getElementById("loanOut").addEventListener("click", function () {
+      var editing = document.getElementById("saveItem").dataset.editing;
+      if (!editing) { alert("Save the item first, then loan it out."); return; }
+      var res = HI.loanItem(state.items, editing, {
+        to: document.getElementById("lTo").value,
+        dueBack: document.getElementById("lDue").value
+      });
+      if (!res.ok) { alert(res.error); return; }
+      save(); renderLoanSection(res.item); renderAll();
+    });
+
+    document.getElementById("loanBack").addEventListener("click", function () {
+      var editing = document.getElementById("saveItem").dataset.editing;
+      var res = HI.returnItem(state.items, editing);
+      if (!res.ok) { alert(res.error); return; }
+      save(); renderLoanSection(res.item); renderAll();
+    });
 
     document.getElementById("itemRows").addEventListener("click", function (e) {
       var eb = e.target.closest("[data-edit]");

@@ -30,6 +30,13 @@ for id in sortSel exportBackup restoreBtn restoreFile serialWarn catTotals readi
 done
 grep -q 'data-dupe' js/app.js && ok "app.js wires Duplicate button" || bad "app.js missing duplicate wiring"
 
+# 4c. sweep-2 UI elements: warranty panel, loan panel, service/loan form sections
+for id in warrantyList loanList fWarranty serviceList loanStatus addService loanOut loanBack; do
+  grep -q "id=\"$id\"" index.html && ok "index.html has #$id" || bad "index.html missing #$id"
+done
+grep -q 'renderWarranties' js/app.js && grep -q 'renderLoans' js/app.js \
+  && ok "app.js renders warranty + loan panels" || bad "app.js missing warranty/loan renders"
+
 # 5+. logic checks via node
 node << 'NODEEOF'
 const HI = require('/home/hatch/workspace/homeinventory-ai/js/inventory.js');
@@ -195,6 +202,77 @@ const risks = HI.underDocumented([
 (risks.length === 1 && risks[0].item.name === 'TV' &&
  risks[0].missing.join(',') === 'photo,date')
   ? ok('underDocumented: only the $2,000 TV flagged, missing photo+date') : bad('underDocumented: ' + JSON.stringify(risks));
+
+// ---- warranties ----
+const wItems = [];
+const wroom = HI.addRoom([], 'Living Room').room;
+const wi = HI.addItem(wItems, { roomId: wroom.id, name: 'Washer', category: 'Appliances', price: '900', date: '2025-01-15' }, [wroom]);
+const wset = HI.setWarrantyMonths(wItems, wi.item.id, 24);
+(wset.ok && wi.item.warrantyMonths === 24)
+  ? ok('setWarrantyMonths stores 24 months') : bad('setWarrantyMonths: ' + JSON.stringify(wset));
+(HI.warrantyExpiry(wi.item) === '2027-01-15')
+  ? ok('warrantyExpiry: 2025-01-15 + 24mo = 2027-01-15') : bad('warrantyExpiry: ' + HI.warrantyExpiry(wi.item));
+const ws = HI.warrantyStatus(wi.item, '2026-11-01');
+(ws.status === 'expiring' && ws.daysLeft === 75)
+  ? ok('warrantyStatus: expiring, 75 days left on 2026-11-01') : bad('warrantyStatus: ' + JSON.stringify(ws));
+const wsAct = HI.warrantyStatus(wi.item, '2026-01-01');
+(wsAct.status === 'active') ? ok('warrantyStatus: active a year out') : bad('warrantyStatus active: ' + JSON.stringify(wsAct));
+const wsExp = HI.warrantyStatus(wi.item, '2028-01-01');
+(wsExp.status === 'expired' && wsExp.daysLeft < 0)
+  ? ok('warrantyStatus: expired after 2027-01-15') : bad('warrantyStatus expired: ' + JSON.stringify(wsExp));
+(HI.warrantyStatus({ name: 'x' }, '2026-11-01').status === 'none')
+  ? ok('warrantyStatus: none when untracked') : bad('warrantyStatus none');
+(!HI.setWarrantyMonths(wItems, wi.item.id, 999).ok)
+  ? ok('setWarrantyMonths rejects 999 months') : bad('warranty range not enforced');
+(!HI.setWarrantyMonths(wItems, 'nope', 12).ok)
+  ? ok('setWarrantyMonths rejects unknown item') : bad('warranty unknown item');
+const alerts = HI.warrantyAlerts(wItems, 90, '2026-11-01');
+(alerts.length === 1 && alerts[0].item.name === 'Washer')
+  ? ok('warrantyAlerts flags the washer 75 days out') : bad('warrantyAlerts: ' + JSON.stringify(alerts));
+
+// ---- service log ----
+const s1 = HI.logService(wItems, wi.item.id, { date: '2026-03-01', description: 'Replaced belt', cost: '120' });
+const s2 = HI.logService(wItems, wi.item.id, { date: '2026-09-01', description: 'Annual check', cost: '' });
+(s1.ok && s2.ok && HI.serviceHistory(wi.item).length === 2)
+  ? ok('logService stores 2 records') : bad('logService: ' + JSON.stringify([s1, s2]));
+(HI.serviceHistory(wi.item)[0].date === '2026-09-01')
+  ? ok('serviceHistory newest-first') : bad('serviceHistory order');
+(HI.lastService(wi.item).description === 'Annual check')
+  ? ok('lastService returns newest') : bad('lastService');
+(HI.totalServiceCost(wi.item) === 120)
+  ? ok('totalServiceCost = $120 (blank cost ignored)') : bad('totalServiceCost: ' + HI.totalServiceCost(wi.item));
+(!HI.logService(wItems, wi.item.id, { date: 'nope', description: 'x' }).ok)
+  ? ok('logService rejects bad date') : bad('service date validation');
+(!HI.logService(wItems, wi.item.id, { date: '2026-01-01', description: '  ' }).ok)
+  ? ok('logService rejects blank description') : bad('service desc validation');
+const sdel = HI.deleteService(wItems, wi.item.id, wi.item.serviceLog[0].id);
+(sdel && HI.serviceHistory(wi.item).length === 1)
+  ? ok('deleteService removes one record') : bad('deleteService');
+(!HI.deleteService(wItems, wi.item.id, 'nope'))
+  ? ok('deleteService rejects unknown entry') : bad('deleteService unknown');
+
+// ---- loan tracker ----
+const l1 = HI.loanItem(wItems, wi.item.id, { to: 'Neighbor Jane', dueBack: '2026-10-01' });
+(l1.ok && wi.item.loan.to === 'Neighbor Jane' && wi.item.loan.date === HI.todayISO())
+  ? ok('loanItem records borrower, defaults loan date to today') : bad('loanItem: ' + JSON.stringify(l1));
+(!HI.loanItem(wItems, wi.item.id, { to: 'Someone else' }).ok)
+  ? ok('loanItem rejects double-loan') : bad('double loan allowed');
+const wi2 = HI.addItem(wItems, { roomId: wroom.id, name: 'Ladder', price: '80' }, [wroom]);
+(!HI.loanItem(wItems, wi2.item.id, { to: '   ' }).ok)
+  ? ok('loanItem rejects blank borrower name') : bad('blank borrower allowed');
+(!HI.loanItem(wItems, wi2.item.id, { to: 'Al', dueBack: 'not-a-date' }).ok)
+  ? ok('loanItem rejects bad due-back date') : bad('bad due-back allowed');
+const loans = HI.loanedItems(wItems, '2026-10-13');
+(loans.length === 1 && loans[0].overdue === true)
+  ? ok('loanedItems: overdue after 2026-10-01 due-back') : bad('loanedItems: ' + JSON.stringify(loans));
+const loansOk = HI.loanedItems(wItems, '2026-09-01');
+(loansOk.length === 1 && loansOk[0].overdue === false)
+  ? ok('loanedItems: not overdue before due-back') : bad('loanedItems early');
+const r1 = HI.returnItem(wItems, wi.item.id);
+(r1.ok && !wi.item.loan && HI.loanedItems(wItems, '2026-10-13').length === 0)
+  ? ok('returnItem clears the loan') : bad('returnItem: ' + JSON.stringify(r1));
+(!HI.returnItem(wItems, wi.item.id).ok)
+  ? ok('returnItem rejects when not on loan') : bad('return when not loaned');
 process.exit(fail ? 1 : 0);
 NODEEOF
 [ "$?" -eq 0 ] && ok "node logic checks all green" || bad "node logic checks failed"
