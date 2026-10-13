@@ -90,10 +90,13 @@ main { padding-top: 26px; padding-bottom: 60px; }
   border-left: 3px solid transparent; transition: background .13s, color .13s, border-color .13s;
   display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
 }
-.room .rcount {
-  font-size: 12px; font-weight: 700; color: var(--muted);
-  background: var(--paper-deep); border-radius: 0; padding: 1px 9px; flex: none;
+.room .rname { font-weight: 600; }
+.room .rmeta {
+  font-size: 11.5px; font-weight: 700; color: var(--muted);
+  background: var(--paper-deep); padding: 2px 9px; flex: none;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.room.active .rmeta { background: #fff; color: var(--olive-deep); }
 .room:hover { background: var(--paper); }
 .room.active {
   background: var(--olive-soft); color: var(--olive-deep); font-weight: 700;
@@ -317,3 +320,25 @@ footer { text-align: center; padding: 26px 20px; border-top: 1px solid var(--lin
 }
 .srow span:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
 #loanStatus p { margin: 0 0 10px; }
+
+/* ---------- 2026 redesign: proof badges + readiness ring ---------- */
+.proof { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }
+.proof-lbl {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted);
+}
+.pdots { display: inline-flex; gap: 4px; }
+.pdot {
+  width: 22px; height: 22px; display: grid; place-items: center;
+  font-size: 10px; font-weight: 800;
+  background: var(--paper-deep); color: var(--muted); border: 1px solid var(--line);
+}
+.pdot.on { background: var(--olive); border-color: var(--olive); color: #fff; }
+.ringwrap { position: relative; width: 92px; height: 92px; }
+.ringwrap .ring-bg { fill: none; stroke: var(--line); stroke-width: 9; }
+.ringwrap .ring-fg { fill: none; stroke: var(--olive); stroke-width: 9; }
+.ringwrap .ring-num {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--serif); font-size: 21px; font-weight: 700; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}

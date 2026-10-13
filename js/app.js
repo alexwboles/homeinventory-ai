@@ -53,10 +53,22 @@
     renderLoans();
   }
 
+  function readinessRing(pct) {
+    var rad = 34, circ = 2 * Math.PI * rad;
+    var off = (circ * (1 - Math.max(0, Math.min(100, pct)) / 100)).toFixed(1);
+    return '<div class="ringwrap" role="img" aria-label="Claim readiness ' + pct + ' percent">' +
+      '<svg width="92" height="92" viewBox="0 0 92 92">' +
+      '<circle cx="46" cy="46" r="' + rad + '" class="ring-bg"/>' +
+      '<circle cx="46" cy="46" r="' + rad + '" class="ring-fg" stroke-dasharray="' + circ.toFixed(1) +
+      '" stroke-dashoffset="' + off + '" transform="rotate(-90 46 46)"/></svg>' +
+      '<span class="ring-num">' + pct + "%</span></div>";
+  }
+
   function renderReadiness() {
     var r = HI.claimReadiness(state.items);
     var a = HI.acvTotals(state.items);
-    document.getElementById("readinessPct").textContent = r.valuePct + '%';
+    document.getElementById("readinessPct").innerHTML = readinessRing(r.valuePct);
+    document.getElementById("readinessPct").classList.remove("big");
     document.getElementById("readinessDetail").textContent =
       r.fullyDocumented + ' of ' + r.total + ' items fully proven';
     document.getElementById("acvTotal").textContent = HI.money(a.acvValue);
@@ -122,9 +134,10 @@
     var html = '<button class="room' + (state.roomFilter === "all" ? " active" : "") +
       '" data-room="all"><span>' + esc("All rooms") + '</span><span class="rcount">' + t.grand.count + '</span></button>';
     html += state.rooms.map(function (r) {
-      var c = (t.perRoom[r.id] || { count: 0 }).count;
+      var rt = t.perRoom[r.id] || { count: 0, value: 0 };
       return '<button class="room' + (state.roomFilter === r.id ? " active" : "") +
-        '" data-room="' + r.id + '"><span>' + esc(r.name) + '</span><span class="rcount">' + c + '</span></button>';
+        '" data-room="' + r.id + '"><span class="rname">' + esc(r.name) + '</span>' +
+        '<span class="rmeta">' + rt.count + ' · ' + HI.money(rt.value) + '</span></button>';
     }).join("");
     document.getElementById("roomList").innerHTML = html;
     var sel = document.getElementById("fRoom");
@@ -178,6 +191,12 @@
     list = HI.sortItems(list, state.sortKey, state.sortDir);
     renderSerialWarning();
     var cards = list.map(function (it) {
+      var pr = HI.itemReadiness(it);
+      var dots = ["photo", "serial", "date"].map(function (k) {
+        var on = pr.checks.indexOf(k) >= 0;
+        return '<span class="pdot' + (on ? " on" : "") + '" title="' +
+          (on ? "Recorded" : "Missing") + ": " + k + '">' + k.charAt(0).toUpperCase() + "</span>";
+      }).join("");
       return '<article class="itemcard">' +
         '<div class="ic-photo">' + (it.photo
           ? '<img class="thumb" src="' + it.photo + '" alt="">'
@@ -186,6 +205,9 @@
         '<span class="ic-cat">' + esc(it.category || "Uncategorized") + '</span>' +
         '<h3>' + esc(it.name) + '</h3>' +
         '<div class="ic-price">' + HI.money(it.price) + '</div>' +
+        '<div class="proof" role="img" aria-label="Claim proof: ' + pr.points + ' of 3 recorded">' +
+        '<span class="proof-lbl">Proof ' + pr.points + "/3</span>" +
+        '<span class="pdots">' + dots + "</span></div>" +
         '<dl class="ic-meta">' +
         '<div><dt>Room</dt><dd>' + esc(roomName(it.roomId)) + '</dd></div>' +
         '<div><dt>Purchased</dt><dd>' + esc(it.date || "—") + '</dd></div>' +

@@ -280,3 +280,23 @@ NODEEOF
 echo "---"
 echo "smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
+
+# redesign sweep: proof badges, readiness ring, room values
+node -e "
+var HI = require('./js/inventory.js');
+// itemReadiness: 3 proofs
+var r = HI.itemReadiness({ photo: 'x', serial: 'AB1', date: '2024-01-01' });
+if (r.points !== 3 || r.pct !== 100) { console.error('3/3 failed'); process.exit(1); }
+var r2 = HI.itemReadiness({ photo: '', serial: '', date: '' });
+if (r2.points !== 0) { console.error('0/3 failed'); process.exit(1); }
+var r3 = HI.itemReadiness({ photo: 'x', serial: '', date: 'bad-date' });
+if (r3.points !== 1 || r3.checks.join() !== 'photo') { console.error('1/3 failed'); process.exit(1); }
+var fs = require('fs'), a = fs.readFileSync('./js/app.js', 'utf8');
+['pdot', 'readinessRing', 'ringwrap', 'rmeta', 'Proof '].forEach(function (s) {
+  if (a.indexOf(s) < 0) { console.error('app missing ' + s); process.exit(1); }
+});
+var c = fs.readFileSync('./css/style.css', 'utf8');
+['.proof', '.pdot.on', '.ringwrap', '.room .rmeta'].forEach(function (s) {
+  if (c.indexOf(s) < 0) { console.error('css missing ' + s); process.exit(1); }
+});
+console.log('OK');" 2>/dev/null && ok "proof badges + readiness ring + room values" || bad "redesign checks"
